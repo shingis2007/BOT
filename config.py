@@ -1,7 +1,5 @@
-BOT_TOKEN = "8607093457:AAGL2rKDkfMiPI67JjXlVpY55TJAeVX0baU"
+import os
 
-# Admin user IDlari (Telegram ID)
-ADMIN_IDS = [6916889579]  # O'z admin ID'ingizni kiriting
-
-# Ma'lumotlar saqlanadigan fayllar
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+ADMIN_IDS = [int(os.environ.get("ADMIN_ID", "0"))]
 DB_FILE = "data/database.json"

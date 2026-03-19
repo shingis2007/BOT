@@ -201,7 +201,7 @@ async def azosi_ism(message: Message, state: FSMContext):
         return
     await state.update_data(ism=message.text)
     await state.set_state(AzosiState.lavozim)
-    await message.answer("💼 Lavozimini kiriting (masalan: Raisi, Kotib, Xazinachi):")
+    await message.answer("💼 Lavozimini kiriting (masalan: Koordinator):")
 
 @router.message(AzosiState.lavozim)
 async def azosi_lavozim(message: Message, state: FSMContext):

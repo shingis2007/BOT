@@ -121,15 +121,15 @@ async def kengash(message: Message):
     azolar = get_kengash_azolari()
     if not azolar:
         await message.answer(
-            "👥 <b>Kengash azolari</b>\n\nHozircha ma'lumot kiritilmagan.",
+            "👥 <b>Kengash a'zolari</b>\n\nHozircha ma'lumot kiritilmagan.",
             parse_mode="HTML"
         )
         return
-    await message.answer("👥 <b>Yoshlar Ittifoqi Kengash Azolari</b>", parse_mode="HTML")
+    await message.answer("👥 <b>Yoshlar Ittifoqi Kengash A'zolari</b>", parse_mode="HTML")
     for a in azolar:
         text = (
-            f"💼 <b>{a['lavozim']}</b>\n"
-            f"👤 {a['ism']}\n"
+            f"💼 <b>{a['Lavozim']}</b>\n"
+            f"👤 {a['Ism-familiyasi']}\n"
             f"🔗 {a['username']}"
         )
         if a.get('photo_id'):

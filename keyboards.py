@@ -3,7 +3,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 def user_main_menu():
     kb = ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="📢 E'lonlar"), KeyboardButton(text="📅 Tadbirlar")],
-        [KeyboardButton(text="📨 Murojaat"), KeyboardButton(text="👥 Kengash azolari")],
+        [KeyboardButton(text="📨 Murojaat"), KeyboardButton(text="👥 Kengash a'zolari")],
         [KeyboardButton(text="ℹ️ Biz haqimizda")]
     ], resize_keyboard=True)
     return kb
@@ -12,7 +12,7 @@ def admin_main_menu():
     kb = ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="📤 E'lon yuborish"), KeyboardButton(text="📅 Tadbir qo'shish")],
         [KeyboardButton(text="📨 Murojaatlar"), KeyboardButton(text="🙋 Qatnashuvchilar")],
-        [KeyboardButton(text="➕ Kengash azosi qo'shish"), KeyboardButton(text="🗑 Azoni o'chirish")],
+        [KeyboardButton(text="➕ Kengash a'zosi qo'shish"), KeyboardButton(text="🗑 A'zoni o'chirish")],
         [KeyboardButton(text="👥 Foydalanuvchilar"), KeyboardButton(text="🔙 Foydalanuvchi menyusi")]
     ], resize_keyboard=True)
     return kb

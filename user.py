@@ -148,6 +148,6 @@ async def haqimizda(message: Message):
         "🎓 <b>Yoshlar Ittifoqi haqida</b>\n\n"
         "Biz universiteti talabalari hayotini yanada mazmunli qilish uchun ishlaydi.\n\n"
         "🎯 Maqsadimiz: Yoshlarni birlashtirish, rivojlantirish va qo'llab-quvvatlash.\n\n"
-        "📞 Bog'lanish: @yoshlar_admin",
+        "📞 Bog'lanish: @ElbekYR",
         parse_mode="HTML"
     )

@@ -249,15 +249,15 @@ async def azosi_photo(message: Message, state: FSMContext):
     )
 
 # 🗑 Azoni o'chirish
-@router.message(F.text == "🗑 Azoni o'chirish")
+@router.message(F.text == "🗑 A'zoni o'chirish")
 async def azosi_ochirish(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
     azolar = get_kengash_azolari()
     if not azolar:
-        await message.answer("👥 Hozircha kengash azolari yo'q.")
+        await message.answer("👥 Hozircha kengash a'zolari yo'q.")
         return
-    text = "🗑 <b>Qaysi azoni o'chirmoqchisiz?</b>\n\nID ni yozing:\n\n"
+    text = "🗑 <b>Qaysi a'zoni o'chirmoqchisiz?</b>\n\nID ni yozing:\n\n"
     for a in azolar:
         text += f"ID: <code>{a['id']}</code> — {a['ism']} ({a['lavozim']})\n"
     await state.set_state(OchirishState.azosi_id)

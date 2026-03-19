@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -12,6 +12,18 @@ router = Router()
 
 class MurojaatState(StatesGroup):
     text = State()
+
+class QatnashState(StatesGroup):
+    tadbir_id = State()
+    ism = State()
+    telefon = State()
+
+def telefon_kb():
+    kb = ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="📱 Raqamni yuborish", request_contact=True)],
+        [KeyboardButton(text="❌ Bekor qilish")]
+    ], resize_keyboard=True)
+    return kb
 
 # /start
 @router.message(CommandStart())
@@ -51,22 +63,73 @@ async def tadbirlar(message: Message):
 
 # Qatnashish callback
 @router.callback_query(F.data.startswith("qatnash_"))
-async def qatnash(callback: CallbackQuery):
+async def qatnash_start(callback: CallbackQuery, state: FSMContext):
     tadbir_id = int(callback.data.split("_")[1])
-    user = callback.from_user
-    natija = add_qatnashuvchi(tadbir_id, user.id, user.full_name, user.username)
+    await state.set_state(QatnashState.ism)
+    await state.update_data(tadbir_id=tadbir_id)
+    await callback.message.answer(
+        "👤 Ism-familiyangizni kiriting:\n(Masalan: Alisher Karimov)",
+        reply_markup=cancel_kb()
+    )
+    await callback.answer()
+
+@router.message(QatnashState.ism)
+async def qatnash_ism(message: Message, state: FSMContext):
+    if message.text == "❌ Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=user_main_menu())
+        return
+    await state.update_data(ism=message.text)
+    await state.set_state(QatnashState.telefon)
+    await message.answer(
+        "📱 Telefon raqamingizni yuboring:",
+        reply_markup=telefon_kb()
+    )
+
+@router.message(QatnashState.telefon)
+async def qatnash_telefon(message: Message, state: FSMContext):
+    if message.text == "❌ Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=user_main_menu())
+        return
+    if message.contact:
+        telefon = message.contact.phone_number
+    elif message.text:
+        telefon = message.text
+    else:
+        await message.answer("📱 Iltimos telefon raqam yuboring:")
+        return
+
+    data = await state.get_data()
+    tadbir_id = data["tadbir_id"]
+    ism = data["ism"]
+    user = message.from_user
+
     tadbirlar = get_tadbirlar()
     tadbir = next((t for t in tadbirlar if t['id'] == tadbir_id), None)
     tadbir_nomi = tadbir['nomi'] if tadbir else f"#{tadbir_id}"
+
+    natija = add_qatnashuvchi(tadbir_id, user.id, ism, user.username, telefon)
+    await state.clear()
+
     if natija:
-        await callback.answer("✅ Qatnashishingiz ro'yxatga olindi!", show_alert=True)
+        await message.answer(
+            f"✅ <b>Muvaffaqiyatli ro'yxatdan o'tdingiz!</b>\n\n"
+            f"📅 Tadbir: <b>{tadbir_nomi}</b>\n"
+            f"👤 Ism: {ism}\n"
+            f"📱 Telefon: {telefon}\n\n"
+            f"Tadbir haqida xabar beramiz!",
+            reply_markup=user_main_menu(),
+            parse_mode="HTML"
+        )
         for admin_id in ADMIN_IDS:
             try:
-                await callback.bot.send_message(
+                await message.bot.send_message(
                     admin_id,
                     f"🙋 <b>Yangi qatnashuvchi!</b>\n\n"
                     f"📅 Tadbir: <b>{tadbir_nomi}</b>\n"
-                    f"👤 Kim: {user.full_name}\n"
+                    f"👤 Ism: {ism}\n"
+                    f"📱 Telefon: {telefon}\n"
                     f"🔗 Nickname: @{user.username or 'username yoq'}\n"
                     f"🆔 ID: <code>{user.id}</code>",
                     parse_mode="HTML"
@@ -74,7 +137,10 @@ async def qatnash(callback: CallbackQuery):
             except:
                 pass
     else:
-        await callback.answer("ℹ️ Siz allaqachon ro'yxatga olindingiz!", show_alert=True)
+        await message.answer(
+            "ℹ️ Siz allaqachon ro'yxatga olindingiz!",
+            reply_markup=user_main_menu()
+        )
 
 # Murojaat
 @router.message(F.text == "📨 Murojaat")
@@ -115,8 +181,8 @@ async def murojaat_save(message: Message, state: FSMContext):
         reply_markup=user_main_menu()
     )
 
-# Kengash azolari
-@router.message(F.text == "👥 Kengash azolari")
+# Kengash a'zolari
+@router.message(F.text == "👥 Kengash a'zolari")
 async def kengash(message: Message):
     azolar = get_kengash_azolari()
     if not azolar:
@@ -128,16 +194,12 @@ async def kengash(message: Message):
     await message.answer("👥 <b>Yoshlar Ittifoqi Kengash A'zolari</b>", parse_mode="HTML")
     for a in azolar:
         text = (
-            f"💼 <b>{a['Lavozim']}</b>\n"
-            f"👤 {a['Ism-familiyasi']}\n"
+            f"💼 <b>{a['lavozim']}</b>\n"
+            f"👤 {a['ism']}\n"
             f"🔗 {a['username']}"
         )
         if a.get('photo_id'):
-            await message.answer_photo(
-                photo=a['photo_id'],
-                caption=text,
-                parse_mode="HTML"
-            )
+            await message.answer_photo(photo=a['photo_id'], caption=text, parse_mode="HTML")
         else:
             await message.answer(text, parse_mode="HTML")
 
@@ -148,6 +210,6 @@ async def haqimizda(message: Message):
         "🎓 <b>Yoshlar Ittifoqi haqida</b>\n\n"
         "Biz universiteti talabalari hayotini yanada mazmunli qilish uchun ishlaydi.\n\n"
         "🎯 Maqsadimiz: Yoshlarni birlashtirish, rivojlantirish va qo'llab-quvvatlash.\n\n"
-        "📞 Bog'lanish: @ElbekYR",
+        "📞 Bog'lanish: @yoshlar_admin",
         parse_mode="HTML"
     )

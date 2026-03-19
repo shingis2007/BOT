@@ -1,18 +1,14 @@
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from keyboards import user_main_menu, cancel_kb
-from database import register_user, add_ariza, add_murojaat, get_tadbirlar
+from keyboards import user_main_menu, cancel_kb, qatnashish_kb
+from database import register_user, add_murojaat, get_tadbirlar, add_qatnashuvchi, get_kengash_azolari
 from config import ADMIN_IDS
 
 router = Router()
-
-# States
-class ArizaState(StatesGroup):
-    text = State()
 
 class MurojaatState(StatesGroup):
     text = State()
@@ -33,8 +29,7 @@ async def start(message: Message):
 @router.message(F.text == "📢 E'lonlar")
 async def elanlar(message: Message):
     await message.answer(
-        "📢 <b>So'nggi e'lonlar</b>\n\n"
-        "Hozircha yangi e'lon yo'q. Kuzatib boring!",
+        "📢 <b>So'nggi e'lonlar</b>\n\nHozircha yangi e'lon yo'q. Kuzatib boring!",
         parse_mode="HTML"
     )
 
@@ -45,61 +40,50 @@ async def tadbirlar(message: Message):
     if not tadbirlar_list:
         await message.answer("📅 Hozircha rejalashtirilgan tadbir yo'q.")
         return
-    text = "📅 <b>Kelgusi tadbirlar:</b>\n\n"
     for t in tadbirlar_list:
-        text += f"🔸 <b>{t['nomi']}</b>\n"
-        text += f"   📆 Sana: {t['sana']}\n"
-        text += f"   📍 Joy: {t['joy']}\n"
-        text += f"   📝 {t['tavsif']}\n\n"
-    await message.answer(text, parse_mode="HTML")
+        text = (
+            f"📅 <b>{t['nomi']}</b>\n"
+            f"📆 Sana: {t['sana']}\n"
+            f"📍 Joy: {t['joy']}\n"
+            f"📝 {t['tavsif']}"
+        )
+        await message.answer(text, reply_markup=qatnashish_kb(t['id']), parse_mode="HTML")
 
-# Ariza yuborish
-@router.message(F.text == "📝 Ariza yuborish")
-async def ariza_start(message: Message, state: FSMContext):
-    await state.set_state(ArizaState.text)
-    await message.answer(
-        "📝 <b>Ariza yuborish</b>\n\n"
-        "Arizangizni yozing (to'liq isming, talaba raqamingiz va maqsadingizni kiriting):",
-        reply_markup=cancel_kb(),
-        parse_mode="HTML"
-    )
-
-@router.message(ArizaState.text)
-async def ariza_save(message: Message, state: FSMContext):
-    if message.text == "❌ Bekor qilish":
-        await state.clear()
-        await message.answer("Bekor qilindi.", reply_markup=user_main_menu())
-        return
-
-    add_ariza(message.from_user.id, message.from_user.full_name, message.text)
-
-    # Adminlarga xabar
-    for admin_id in ADMIN_IDS:
-        try:
-            await message.bot.send_message(
-                admin_id,
-                f"📝 <b>Yangi ariza!</b>\n\n"
-                f"👤 Kim: {message.from_user.full_name} (@{message.from_user.username or 'username yoq'})\n"
-                f"🆔 ID: <code>{message.from_user.id}</code>\n\n"
-                f"📄 Ariza:\n{message.text}",
-                parse_mode="HTML"
-            )
-        except:
-            pass
-
-    await state.clear()
-    await message.answer(
-        "✅ Arizangiz qabul qilindi! Tez orada javob beramiz.",
-        reply_markup=user_main_menu()
-    )
+# Qatnashish callback
+@router.callback_query(F.data.startswith("qatnash_"))
+async def qatnash(callback: CallbackQuery):
+    tadbir_id = int(callback.data.split("_")[1])
+    user = callback.from_user
+    natija = add_qatnashuvchi(tadbir_id, user.id, user.full_name, user.username)
+    tadbirlar = get_tadbirlar()
+    tadbir = next((t for t in tadbirlar if t['id'] == tadbir_id), None)
+    tadbir_nomi = tadbir['nomi'] if tadbir else f"#{tadbir_id}"
+    if natija:
+        await callback.answer("✅ Qatnashishingiz ro'yxatga olindi!", show_alert=True)
+        for admin_id in ADMIN_IDS:
+            try:
+                await callback.bot.send_message(
+                    admin_id,
+                    f"🙋 <b>Yangi qatnashuvchi!</b>\n\n"
+                    f"📅 Tadbir: <b>{tadbir_nomi}</b>\n"
+                    f"👤 Kim: {user.full_name}\n"
+                    f"🔗 Nickname: @{user.username or 'username yoq'}\n"
+                    f"🆔 ID: <code>{user.id}</code>",
+                    parse_mode="HTML"
+                )
+            except:
+                pass
+    else:
+        await callback.answer("ℹ️ Siz allaqachon ro'yxatga olindingiz!", show_alert=True)
 
 # Murojaat
-@router.message(F.text == "🎧 Murojaat")
+@router.message(F.text == "📨 Murojaat")
 async def murojaat_start(message: Message, state: FSMContext):
     await state.set_state(MurojaatState.text)
     await message.answer(
-        "🎧 <b>Murojaat yuborish</b>\n\n"
-        "Savolingiz yoki muammongizni yozing:",
+        "📨 <b>Murojaat yuborish</b>\n\n"
+        "Ariza, savol yoki muammoingizni yozing.\n"
+        "Tez orada javob beramiz!",
         reply_markup=cancel_kb(),
         parse_mode="HTML"
     )
@@ -110,28 +94,52 @@ async def murojaat_save(message: Message, state: FSMContext):
         await state.clear()
         await message.answer("Bekor qilindi.", reply_markup=user_main_menu())
         return
-
-    add_murojaat(message.from_user.id, message.from_user.full_name, message.text)
-
-    # Adminlarga xabar
+    add_murojaat(message.from_user.id, message.from_user.full_name, message.from_user.username, message.text)
     for admin_id in ADMIN_IDS:
         try:
             await message.bot.send_message(
                 admin_id,
-                f"🎧 <b>Yangi murojaat!</b>\n\n"
-                f"👤 Kim: {message.from_user.full_name} (@{message.from_user.username or 'username yoq'})\n"
+                f"📨 <b>Yangi murojaat!</b>\n\n"
+                f"👤 Kim: {message.from_user.full_name}\n"
+                f"🔗 Nickname: @{message.from_user.username or 'username yoq'}\n"
                 f"🆔 ID: <code>{message.from_user.id}</code>\n\n"
-                f"💬 Murojaat:\n{message.text}",
+                f"💬 Murojaat:\n{message.text}\n\n"
+                f"📨 Javob: /javob_{message.from_user.id}",
                 parse_mode="HTML"
             )
         except:
             pass
-
     await state.clear()
     await message.answer(
-        "✅ Murojaatingiz qabul qilindi! 24 soat ichida javob beramiz.",
+        "✅ Murojaatingiz qabul qilindi!\n24 soat ichida javob beramiz.",
         reply_markup=user_main_menu()
     )
+
+# Kengash azolari
+@router.message(F.text == "👥 Kengash azolari")
+async def kengash(message: Message):
+    azolar = get_kengash_azolari()
+    if not azolar:
+        await message.answer(
+            "👥 <b>Kengash azolari</b>\n\nHozircha ma'lumot kiritilmagan.",
+            parse_mode="HTML"
+        )
+        return
+    await message.answer("👥 <b>Yoshlar Ittifoqi Kengash Azolari</b>", parse_mode="HTML")
+    for a in azolar:
+        text = (
+            f"💼 <b>{a['lavozim']}</b>\n"
+            f"👤 {a['ism']}\n"
+            f"🔗 {a['username']}"
+        )
+        if a.get('photo_id'):
+            await message.answer_photo(
+                photo=a['photo_id'],
+                caption=text,
+                parse_mode="HTML"
+            )
+        else:
+            await message.answer(text, parse_mode="HTML")
 
 # Biz haqimizda
 @router.message(F.text == "ℹ️ Biz haqimizda")
@@ -140,6 +148,6 @@ async def haqimizda(message: Message):
         "🎓 <b>Yoshlar Ittifoqi haqida</b>\n\n"
         "Biz universiteti talabalari hayotini yanada mazmunli qilish uchun ishlaydi.\n\n"
         "🎯 Maqsadimiz: Yoshlarni birlashtirish, rivojlantirish va qo'llab-quvvatlash.\n\n"
-        "📞 Bog'lanish uchun: @yoshlar_admin",
+        "📞 Bog'lanish: @yoshlar_admin",
         parse_mode="HTML"
     )

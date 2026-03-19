@@ -9,10 +9,11 @@ def load_db():
         os.makedirs("data", exist_ok=True)
         default = {
             "users": {},
-            "arizalar": [],
             "murojaatlar": [],
             "tadbirlar": [],
-            "elanlar": []
+            "elanlar": [],
+            "qatnashuvchilar": {},
+            "kengash_azolari": []
         }
         save_db(default)
         return default
@@ -33,24 +34,13 @@ def register_user(user_id, full_name, username):
     }
     save_db(db)
 
-def add_ariza(user_id, full_name, text):
-    db = load_db()
-    db["arizalar"].append({
-        "id": len(db["arizalar"]) + 1,
-        "user_id": user_id,
-        "full_name": full_name,
-        "text": text,
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "status": "yangi"
-    })
-    save_db(db)
-
-def add_murojaat(user_id, full_name, text):
+def add_murojaat(user_id, full_name, username, text):
     db = load_db()
     db["murojaatlar"].append({
         "id": len(db["murojaatlar"]) + 1,
         "user_id": user_id,
         "full_name": full_name,
+        "username": username or "",
         "text": text,
         "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "status": "yangi"
@@ -59,22 +49,20 @@ def add_murojaat(user_id, full_name, text):
 
 def add_tadbir(nomi, sana, joy, tavsif):
     db = load_db()
+    tadbir_id = len(db["tadbirlar"]) + 1
     db["tadbirlar"].append({
-        "id": len(db["tadbirlar"]) + 1,
+        "id": tadbir_id,
         "nomi": nomi,
         "sana": sana,
         "joy": joy,
         "tavsif": tavsif
     })
     save_db(db)
+    return tadbir_id
 
 def get_tadbirlar():
     db = load_db()
     return db["tadbirlar"]
-
-def get_arizalar():
-    db = load_db()
-    return db["arizalar"]
 
 def get_murojaatlar():
     db = load_db()
@@ -83,3 +71,54 @@ def get_murojaatlar():
 def get_all_users():
     db = load_db()
     return db["users"]
+
+def add_qatnashuvchi(tadbir_id, user_id, full_name, username):
+    db = load_db()
+    key = str(tadbir_id)
+    if "qatnashuvchilar" not in db:
+        db["qatnashuvchilar"] = {}
+    if key not in db["qatnashuvchilar"]:
+        db["qatnashuvchilar"][key] = []
+    for q in db["qatnashuvchilar"][key]:
+        if q["user_id"] == user_id:
+            return False
+    db["qatnashuvchilar"][key].append({
+        "user_id": user_id,
+        "full_name": full_name,
+        "username": username or "",
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M")
+    })
+    save_db(db)
+    return True
+
+def get_qatnashuvchilar(tadbir_id=None):
+    db = load_db()
+    if "qatnashuvchilar" not in db:
+        return {}
+    if tadbir_id:
+        return db["qatnashuvchilar"].get(str(tadbir_id), [])
+    return db["qatnashuvchilar"]
+
+# Kengash azolari
+def add_kengash_azosi(ism, lavozim, username, photo_id=None):
+    db = load_db()
+    if "kengash_azolari" not in db:
+        db["kengash_azolari"] = []
+    db["kengash_azolari"].append({
+        "id": len(db["kengash_azolari"]) + 1,
+        "ism": ism,
+        "lavozim": lavozim,
+        "username": username or "",
+        "photo_id": photo_id or "",
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M")
+    })
+    save_db(db)
+
+def get_kengash_azolari():
+    db = load_db()
+    return db.get("kengash_azolari", [])
+
+def delete_kengash_azosi(azosi_id):
+    db = load_db()
+    db["kengash_azolari"] = [a for a in db.get("kengash_azolari", []) if a["id"] != azosi_id]
+    save_db(db)

@@ -5,7 +5,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from keyboards import admin_main_menu, user_main_menu, cancel_kb
-from database import add_tadbir, get_arizalar, get_murojaatlar, get_all_users
+from database import (add_tadbir, get_murojaatlar, get_all_users,
+                      get_qatnashuvchilar, get_tadbirlar,
+                      add_kengash_azosi, get_kengash_azolari, delete_kengash_azosi)
 from config import ADMIN_IDS
 
 router = Router()
@@ -13,7 +15,6 @@ router = Router()
 def is_admin(user_id):
     return user_id in ADMIN_IDS
 
-# States
 class ElanState(StatesGroup):
     text = State()
 
@@ -23,7 +24,20 @@ class TadbirState(StatesGroup):
     joy = State()
     tavsif = State()
 
-# /admin buyrug'i
+class JavobState(StatesGroup):
+    user_id = State()
+    text = State()
+
+class AzosiState(StatesGroup):
+    ism = State()
+    lavozim = State()
+    username = State()
+    photo = State()
+
+class OchirishState(StatesGroup):
+    azosi_id = State()
+
+# /admin
 @router.message(Command("admin"))
 async def admin_panel(message: Message):
     if not is_admin(message.from_user.id):
@@ -35,7 +49,6 @@ async def admin_panel(message: Message):
         parse_mode="HTML"
     )
 
-# Foydalanuvchi menyusiga qaytish
 @router.message(F.text == "🔙 Foydalanuvchi menyusi")
 async def back_to_user(message: Message):
     await message.answer("Foydalanuvchi menyusi:", reply_markup=user_main_menu())
@@ -46,11 +59,7 @@ async def elan_start(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
     await state.set_state(ElanState.text)
-    await message.answer(
-        "📤 <b>Barcha foydalanuvchilarga e'lon yuboring:</b>\n\nMatnni kiriting:",
-        reply_markup=cancel_kb(),
-        parse_mode="HTML"
-    )
+    await message.answer("📤 Barcha foydalanuvchilarga e'lon matni yozing:", reply_markup=cancel_kb())
 
 @router.message(ElanState.text)
 async def elan_send(message: Message, state: FSMContext):
@@ -58,11 +67,9 @@ async def elan_send(message: Message, state: FSMContext):
         await state.clear()
         await message.answer("Bekor qilindi.", reply_markup=admin_main_menu())
         return
-
     users = get_all_users()
     yuborildi = 0
     xato = 0
-
     for user_id in users.keys():
         try:
             await message.bot.send_message(
@@ -73,12 +80,9 @@ async def elan_send(message: Message, state: FSMContext):
             yuborildi += 1
         except:
             xato += 1
-
     await state.clear()
     await message.answer(
-        f"✅ E'lon yuborildi!\n\n"
-        f"✔️ Muvaffaqiyatli: {yuborildi} ta\n"
-        f"❌ Xatolik: {xato} ta",
+        f"✅ E'lon yuborildi!\n✔️ {yuborildi} ta\n❌ {xato} ta xatolik",
         reply_markup=admin_main_menu()
     )
 
@@ -98,7 +102,7 @@ async def tadbir_nomi(message: Message, state: FSMContext):
         return
     await state.update_data(nomi=message.text)
     await state.set_state(TadbirState.sana)
-    await message.answer("📆 Tadbir sanasini kiriting (masalan: 20-mart 2025):")
+    await message.answer("📆 Tadbir sanasini kiriting:")
 
 @router.message(TadbirState.sana)
 async def tadbir_sana(message: Message, state: FSMContext):
@@ -108,7 +112,7 @@ async def tadbir_sana(message: Message, state: FSMContext):
         return
     await state.update_data(sana=message.text)
     await state.set_state(TadbirState.joy)
-    await message.answer("📍 Tadbir o'tkaziladigan joyni kiriting:")
+    await message.answer("📍 Tadbir joyini kiriting:")
 
 @router.message(TadbirState.joy)
 async def tadbir_joy(message: Message, state: FSMContext):
@@ -118,7 +122,7 @@ async def tadbir_joy(message: Message, state: FSMContext):
         return
     await state.update_data(joy=message.text)
     await state.set_state(TadbirState.tavsif)
-    await message.answer("📝 Tadbir haqida qisqacha tavsif kiriting:")
+    await message.answer("📝 Tadbir tavsifini kiriting:")
 
 @router.message(TadbirState.tavsif)
 async def tadbir_save(message: Message, state: FSMContext):
@@ -127,33 +131,15 @@ async def tadbir_save(message: Message, state: FSMContext):
         await message.answer("Bekor qilindi.", reply_markup=admin_main_menu())
         return
     data = await state.get_data()
-    add_tadbir(data["nomi"], data["sana"], data["joy"], message.text)
+    tadbir_id = add_tadbir(data["nomi"], data["sana"], data["joy"], message.text)
     await state.clear()
     await message.answer(
-        f"✅ Tadbir qo'shildi!\n\n"
-        f"🎉 <b>{data['nomi']}</b>\n"
-        f"📆 {data['sana']} | 📍 {data['joy']}",
+        f"✅ Tadbir qo'shildi!\n\n🎉 <b>{data['nomi']}</b>\n📆 {data['sana']} | 📍 {data['joy']}",
         reply_markup=admin_main_menu(),
         parse_mode="HTML"
     )
 
-# Arizalar ro'yxati
-@router.message(F.text == "📋 Arizalar")
-async def arizalar(message: Message):
-    if not is_admin(message.from_user.id):
-        return
-    arizalar_list = get_arizalar()
-    if not arizalar_list:
-        await message.answer("📋 Hozircha ariza yo'q.")
-        return
-    text = f"📋 <b>Jami arizalar: {len(arizalar_list)} ta</b>\n\n"
-    for a in arizalar_list[-10:]:  # Oxirgi 10 ta
-        text += f"#{a['id']} | {a['full_name']}\n"
-        text += f"📅 {a['date']}\n"
-        text += f"📄 {a['text'][:100]}...\n\n"
-    await message.answer(text, parse_mode="HTML")
-
-# Murojaatlar ro'yxati
+# Murojaatlar
 @router.message(F.text == "📨 Murojaatlar")
 async def murojaatlar(message: Message):
     if not is_admin(message.from_user.id):
@@ -162,20 +148,167 @@ async def murojaatlar(message: Message):
     if not murojaatlar_list:
         await message.answer("📨 Hozircha murojaat yo'q.")
         return
-    text = f"📨 <b>Jami murojaatlar: {len(murojaatlar_list)} ta</b>\n\n"
+    text = f"📨 <b>Jami: {len(murojaatlar_list)} ta murojaat</b>\n\n"
     for m in murojaatlar_list[-10:]:
-        text += f"#{m['id']} | {m['full_name']}\n"
+        uname = f"@{m.get('username')}" if m.get('username') else "username yoq"
+        text += f"#{m['id']} | {m['full_name']} ({uname})\n"
         text += f"📅 {m['date']}\n"
-        text += f"💬 {m['text'][:100]}...\n\n"
+        text += f"💬 {m['text'][:100]}\n"
+        text += f"📨 /javob_{m['user_id']}\n\n"
     await message.answer(text, parse_mode="HTML")
 
-# Foydalanuvchilar soni
+# Qatnashuvchilar
+@router.message(F.text == "🙋 Qatnashuvchilar")
+async def qatnashuvchilar(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+    tadbirlar = get_tadbirlar()
+    barcha = get_qatnashuvchilar()
+    if not barcha:
+        await message.answer("🙋 Hozircha hech kim qatnashishini bildirmagan.")
+        return
+    for t in tadbirlar:
+        qlist = barcha.get(str(t['id']), [])
+        if not qlist:
+            continue
+        text = f"📅 <b>{t['nomi']}</b> — {len(qlist)} ta qatnashuvchi\n\n"
+        for i, q in enumerate(qlist, 1):
+            uname = f"@{q['username']}" if q.get('username') else "username yoq"
+            text += f"{i}. {q['full_name']} ({uname})\n"
+        await message.answer(text, parse_mode="HTML")
+
+# Foydalanuvchilar
 @router.message(F.text == "👥 Foydalanuvchilar")
 async def foydalanuvchilar(message: Message):
     if not is_admin(message.from_user.id):
         return
     users = get_all_users()
+    await message.answer(f"👥 <b>Foydalanuvchilar soni: {len(users)} ta</b>", parse_mode="HTML")
+
+# ➕ Kengash azosi qo'shish
+@router.message(F.text == "➕ Kengash azosi qo'shish")
+async def azosi_start(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    await state.set_state(AzosiState.ism)
+    await message.answer("👤 Azoning to'liq ismini kiriting:", reply_markup=cancel_kb())
+
+@router.message(AzosiState.ism)
+async def azosi_ism(message: Message, state: FSMContext):
+    if message.text == "❌ Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=admin_main_menu())
+        return
+    await state.update_data(ism=message.text)
+    await state.set_state(AzosiState.lavozim)
+    await message.answer("💼 Lavozimini kiriting (masalan: Raisi, Kotib, Xazinachi):")
+
+@router.message(AzosiState.lavozim)
+async def azosi_lavozim(message: Message, state: FSMContext):
+    if message.text == "❌ Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=admin_main_menu())
+        return
+    await state.update_data(lavozim=message.text)
+    await state.set_state(AzosiState.username)
+    await message.answer("🔗 Telegram username kiriting (masalan: @username):")
+
+@router.message(AzosiState.username)
+async def azosi_username(message: Message, state: FSMContext):
+    if message.text == "❌ Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=admin_main_menu())
+        return
+    await state.update_data(username=message.text)
+    await state.set_state(AzosiState.photo)
+    await message.answer("📸 Endi azoning rasmini yuboring (rasm bo'lmasa 'O'tkazib yuborish' yozing):")
+
+@router.message(AzosiState.photo)
+async def azosi_photo(message: Message, state: FSMContext):
+    if message.text == "❌ Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=admin_main_menu())
+        return
+
+    data = await state.get_data()
+    photo_id = None
+
+    if message.photo:
+        photo_id = message.photo[-1].file_id
+    
+    add_kengash_azosi(data["ism"], data["lavozim"], data["username"], photo_id)
+    await state.clear()
     await message.answer(
-        f"👥 <b>Foydalanuvchilar soni: {len(users)} ta</b>",
+        f"✅ Kengash azosi qo'shildi!\n\n"
+        f"👤 <b>{data['ism']}</b>\n"
+        f"💼 {data['lavozim']}\n"
+        f"🔗 {data['username']}\n"
+        f"📸 Rasm: {'✅ qo\'shildi' if photo_id else '❌ yo\'q'}",
+        reply_markup=admin_main_menu(),
         parse_mode="HTML"
     )
+
+# 🗑 Azoni o'chirish
+@router.message(F.text == "🗑 Azoni o'chirish")
+async def azosi_ochirish(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    azolar = get_kengash_azolari()
+    if not azolar:
+        await message.answer("👥 Hozircha kengash azolari yo'q.")
+        return
+    text = "🗑 <b>Qaysi azoni o'chirmoqchisiz?</b>\n\nID ni yozing:\n\n"
+    for a in azolar:
+        text += f"ID: <code>{a['id']}</code> — {a['ism']} ({a['lavozim']})\n"
+    await state.set_state(OchirishState.azosi_id)
+    await message.answer(text, reply_markup=cancel_kb(), parse_mode="HTML")
+
+@router.message(OchirishState.azosi_id)
+async def azosi_ochirish_confirm(message: Message, state: FSMContext):
+    if message.text == "❌ Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=admin_main_menu())
+        return
+    try:
+        azosi_id = int(message.text)
+        delete_kengash_azosi(azosi_id)
+        await state.clear()
+        await message.answer(f"✅ #{azosi_id} ID li azos o'chirildi.", reply_markup=admin_main_menu())
+    except:
+        await message.answer("❌ Noto'g'ri ID. Qaytadan kiriting:")
+
+# Javob berish
+@router.message(F.text.startswith("/javob_"))
+async def javob_start(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    try:
+        user_id = int(message.text.split("_")[1])
+        await state.set_state(JavobState.text)
+        await state.update_data(user_id=user_id)
+        await message.answer(
+            f"✏️ Foydalanuvchi <code>{user_id}</code> ga javob yozing:",
+            reply_markup=cancel_kb(),
+            parse_mode="HTML"
+        )
+    except:
+        await message.answer("❌ Xatolik.")
+
+@router.message(JavobState.text)
+async def javob_send(message: Message, state: FSMContext):
+    if message.text == "❌ Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=admin_main_menu())
+        return
+    data = await state.get_data()
+    try:
+        await message.bot.send_message(
+            data["user_id"],
+            f"📬 <b>Yoshlar Ittifoqidan javob:</b>\n\n{message.text}",
+            parse_mode="HTML"
+        )
+        await state.clear()
+        await message.answer("✅ Javob yuborildi!", reply_markup=admin_main_menu())
+    except:
+        await state.clear()
+        await message.answer("❌ Foydalanuvchiga xabar yuborib bo'lmadi.", reply_markup=admin_main_menu())

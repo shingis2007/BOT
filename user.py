@@ -82,7 +82,7 @@ async def qatnash_ism(message: Message, state: FSMContext):
     await state.update_data(ism=message.text)
     await state.set_state(QatnashState.telefon)
     await message.answer(
-        "📱 Telefon raqamingizni yuboring:",
+        "📱 Telefon raqamingizni kiriting:",
         reply_markup=telefon_kb()
     )
 

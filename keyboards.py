@@ -1,26 +1,30 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
-# Foydalanuvchi asosiy menyu
 def user_main_menu():
     kb = ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="📢 E'lonlar"), KeyboardButton(text="📅 Tadbirlar")],
-        [KeyboardButton(text="📝 Ariza yuborish"), KeyboardButton(text="🎧 Murojaat")],
+        [KeyboardButton(text="📨 Murojaat"), KeyboardButton(text="👥 Kengash azolari")],
         [KeyboardButton(text="ℹ️ Biz haqimizda")]
     ], resize_keyboard=True)
     return kb
 
-# Admin asosiy menyu
 def admin_main_menu():
     kb = ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="📤 E'lon yuborish"), KeyboardButton(text="📅 Tadbir qo'shish")],
-        [KeyboardButton(text="📋 Arizalar"), KeyboardButton(text="📨 Murojaatlar")],
+        [KeyboardButton(text="📨 Murojaatlar"), KeyboardButton(text="🙋 Qatnashuvchilar")],
+        [KeyboardButton(text="➕ Kengash azosi qo'shish"), KeyboardButton(text="🗑 Azoni o'chirish")],
         [KeyboardButton(text="👥 Foydalanuvchilar"), KeyboardButton(text="🔙 Foydalanuvchi menyusi")]
     ], resize_keyboard=True)
     return kb
 
-# Bekor qilish tugmasi
 def cancel_kb():
     kb = ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="❌ Bekor qilish")]
     ], resize_keyboard=True)
+    return kb
+
+def qatnashish_kb(tadbir_id):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Men qatnashaman", callback_data=f"qatnash_{tadbir_id}")]
+    ])
     return kb

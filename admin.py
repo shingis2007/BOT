@@ -241,7 +241,8 @@ async def azo_photo(message: Message, state: FSMContext):
         f"👤 <b>{data['ism']}</b>\n"
         f"💼 {data['lavozim']}\n"
         f"🔗 {data['username']}\n"
-        f"📸 Rasm: {'✅ qo\'shildi' if photo_id else '❌ yo\'q'}",
+        rasm_status = "✅ qo'shildi" if photo_id else "❌ yo'q"
+        f"📸 Rasm: {rasm_status}",
         reply_markup=admin_main_menu(),
         parse_mode="HTML"
     )
